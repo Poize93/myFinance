@@ -600,7 +600,8 @@ export function App() {
 	
 	// Function to check if an investment is used for calculation
 	const isInvestmentUsedForCalculation = (investment: Investment): boolean => {
-		return latestInvestmentIds.has(investment.id)
+		return investment.id !== undefined && latestInvestmentIds.has(investment.id)
+
 	}
 	
 	const formatINR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 })
