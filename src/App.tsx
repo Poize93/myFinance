@@ -247,6 +247,13 @@ export function App() {
 
 	// Load option lists from Supabase (reload when user changes)
 	useEffect(() => {
+		// Reset to defaults immediately to avoid showing previous user's options
+		setBankTypeOptions(['Checking','Savings','Credit Union','Digital Wallet'])
+		setCardTypeOptions(['Debit','Credit','Prepaid','Virtual'])
+		setExpenseTypeOptions(['Food','Transport','Bills','Entertainment','Shopping','Travel','Health','Other'])
+		setInvestmentModeOptions(['SIP','Lump Sum','Systematic Transfer','Dividend Reinvestment'])
+		setInvestmentTypeOptions(['Mutual Fund','Stocks','Bonds','ETF','Fixed Deposit','PPF','Gold','Real Estate','Cryptocurrency'])
+
 		let isActive = true
 		;(async () => {
 			try {
@@ -587,6 +594,14 @@ export function App() {
 	const totalInvestmentAmount = latestInvestments.reduce((sum, i) => sum + i.investment_amount, 0)
 	const totalCurrentValue = latestInvestments.reduce((sum, i) => sum + i.current_value, 0)
 	const totalReturnValue = latestInvestments.reduce((sum, i) => sum + i.return_value, 0)
+
+	// Create a Set of IDs for investments that are used in calculations (latest for each unique combination)
+	const latestInvestmentIds = new Set(latestInvestments.map(i => i.id).filter(id => id !== undefined))
+	
+	// Function to check if an investment is used for calculation
+	const isInvestmentUsedForCalculation = (investment: Investment): boolean => {
+		return latestInvestmentIds.has(investment.id)
+	}
 	
 	const formatINR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 })
 
@@ -894,6 +909,20 @@ export function App() {
 						<Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, fontStyle: 'italic' }}>
 							* Investment values shown are the latest entries for each unique investment combination up to the selected date
 						</Typography>
+						<Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+							<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+								<Box sx={{ width: 16, height: 16, backgroundColor: 'rgba(76, 175, 80, 0.2)', border: '2px solid #4caf50', borderRadius: 1 }} />
+								<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+									Used for calculation (latest value)
+								</Typography>
+							</Box>
+							<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+								<Box sx={{ width: 16, height: 16, backgroundColor: 'rgba(255, 107, 107, 0.2)', border: '2px solid #ff6b6b', borderRadius: 1 }} />
+								<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+									Expense entries
+								</Typography>
+							</Box>
+						</Box>
 						<Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mb: 3 }}>
 							<Paper elevation={1} sx={{ p: 2, borderRadius: 2, background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)' }}>
 								<Typography variant="h6" sx={{ color: 'white', mb: 1 }}>Total Expenses</Typography>
@@ -958,7 +987,15 @@ export function App() {
 				{/* Investment Today's Entry - Simple view without totals */}
 				{mode === 'investments' && !showAll && investments.length > 0 && (
 					<Box sx={{ marginTop: 2 }}>
-						<Typography variant="h6" sx={{ mb: 1 }}>Today's Entry</Typography>
+						<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+							<Typography variant="h6">Today's Entry</Typography>
+							<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+								<Box sx={{ width: 12, height: 12, backgroundColor: 'rgba(76, 175, 80, 0.2)', border: '2px solid #4caf50', borderRadius: 1 }} />
+								<Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+									Latest value used for totals
+								</Typography>
+							</Box>
+						</Box>
 						<TableContainer component={Paper} sx={{ backgroundColor: 'rgba(0,0,0,0.03)', border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: '0 8px 20px rgba(0,0,0,0.06)' }}>
 							<Table size="small">
 								<TableHead>
@@ -976,12 +1013,18 @@ export function App() {
 									{filteredInvestments.map((i, idx) => {
 											const isEditing = editingIndex === idx
 											const hasNegativeValue = i.current_value < 0 || i.investment_amount < 0
+											const isUsedForCalculation = isInvestmentUsedForCalculation(i)
 											return (
 												<TableRow 
 													key={idx} 
 													hover
 													sx={{
-														backgroundColor: hasNegativeValue ? 'rgba(255, 0, 0, 0.15)' : 'inherit'
+														backgroundColor: hasNegativeValue 
+															? 'rgba(255, 0, 0, 0.15)' 
+															: isUsedForCalculation 
+																? 'rgba(76, 175, 80, 0.2)' // Light green for calculation rows
+																: 'inherit',
+														borderLeft: isUsedForCalculation ? '4px solid #4caf50' : 'none'
 													}}
 												>
 													<TableCell>
@@ -993,7 +1036,23 @@ export function App() {
 																slotProps={{ textField: { size: 'small' } }}
 															/>
 														) : (
-															<span>{i.date || '—'}</span>
+															<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+																<span>{i.date || '—'}</span>
+																{isUsedForCalculation && (
+																	<span 
+																		style={{ 
+																			fontSize: '0.7rem', 
+																			color: '#4caf50', 
+																			fontWeight: 'bold',
+																			backgroundColor: 'rgba(76, 175, 80, 0.1)',
+																			padding: '2px 6px',
+																			borderRadius: '4px'
+																		}}
+																	>
+																		✓ Used
+																	</span>
+																)}
+															</Box>
 														)}
 													</TableCell>
 													<TableCell>
@@ -1129,13 +1188,23 @@ export function App() {
 
 				{((mode === 'expenses' && expenses.length > 0 && expenseViewMode === 'table') || (mode === 'investments' && investments.length > 0 && investmentViewMode === 'table') || (mode === 'totalAssets' && (expenses.length > 0 || investments.length > 0))) && (showAll || mode !== 'investments') && (mode !== 'totalAssets' || showAll) && (
 					<Box sx={{ marginTop: 2 }}>
-						<Typography variant="h6" sx={{ mb: 1 }}>
-							{showAll ? 
-								(mode === 'expenses' ? 'All Expenses' : 
-								 mode === 'investments' ? 'All Investments' : 
-								 'All Transactions') : 
-								`Today's Entry`}
-						</Typography>
+						<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+							<Typography variant="h6">
+								{showAll ? 
+									(mode === 'expenses' ? 'All Expenses' : 
+									 mode === 'investments' ? 'All Investments' : 
+									 'All Transactions') : 
+									`Today's Entry`}
+							</Typography>
+							{mode === 'investments' && (
+								<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+									<Box sx={{ width: 12, height: 12, backgroundColor: 'rgba(76, 175, 80, 0.2)', border: '2px solid #4caf50', borderRadius: 1 }} />
+									<Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+										Latest value used for totals
+									</Typography>
+								</Box>
+							)}
+						</Box>
 						<TableContainer component={Paper} sx={{ backgroundColor: 'rgba(0,0,0,0.03)', border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: '0 8px 20px rgba(0,0,0,0.06)' }}>
 							<Table size="small">
 								<TableHead>
@@ -1477,12 +1546,18 @@ export function App() {
 										filteredInvestments.map((i, idx) => {
 											const isEditing = editingIndex === idx
 											const hasNegativeValue = i.current_value < 0 || i.investment_amount < 0
+											const isUsedForCalculation = isInvestmentUsedForCalculation(i)
 											return (
 												<TableRow 
 													key={idx} 
 													hover
 													sx={{
-														backgroundColor: hasNegativeValue ? 'rgba(255, 0, 0, 0.15)' : 'inherit'
+														backgroundColor: hasNegativeValue 
+															? 'rgba(255, 0, 0, 0.15)' 
+															: isUsedForCalculation 
+																? 'rgba(76, 175, 80, 0.2)' // Light green for calculation rows
+																: 'inherit',
+														borderLeft: isUsedForCalculation ? '4px solid #4caf50' : 'none'
 													}}
 												>
 													<TableCell>
@@ -1494,7 +1569,23 @@ export function App() {
 																slotProps={{ textField: { size: 'small' } }}
 															/>
 														) : (
-															<span>{i.date || '—'}</span>
+															<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+																<span>{i.date || '—'}</span>
+																{isUsedForCalculation && (
+																	<span 
+																		style={{ 
+																			fontSize: '0.7rem', 
+																			color: '#4caf50', 
+																			fontWeight: 'bold',
+																			backgroundColor: 'rgba(76, 175, 80, 0.1)',
+																			padding: '2px 6px',
+																			borderRadius: '4px'
+																		}}
+																	>
+																		✓ Used
+																	</span>
+																)}
+															</Box>
 														)}
 													</TableCell>
 													<TableCell>
@@ -1590,17 +1681,32 @@ export function App() {
 												type: 'Expense',
 												data: e,
 												index: idx,
-												key: `expense-${idx}`
+												key: `expense-${idx}`,
+												isUsedForCalculation: true // All expenses up to cutoff are used
 											})),
 											...latestInvestments.map((i, idx) => ({
 												type: 'Investment',
 												data: i,
 												index: idx,
-												key: `investment-${idx}`
+												key: `investment-${idx}`,
+												isUsedForCalculation: true // All latest investments are used
 											}))
 										]
 										.map((item) => (
-											<TableRow key={item.key} hover>
+											<TableRow 
+												key={item.key} 
+												hover
+												sx={{
+													backgroundColor: item.isUsedForCalculation 
+														? (item.type === 'Expense' 
+															? 'rgba(255, 107, 107, 0.2)' // Light red for expense calculation rows
+															: 'rgba(76, 175, 80, 0.2)') // Light green for investment calculation rows
+														: 'inherit',
+													borderLeft: item.isUsedForCalculation 
+														? `4px solid ${item.type === 'Expense' ? '#ff6b6b' : '#4caf50'}` 
+														: 'none'
+												}}
+											>
 												<TableCell>
 													<span>{item.data.date || '—'}</span>
 												</TableCell>

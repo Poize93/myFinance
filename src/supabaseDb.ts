@@ -324,7 +324,7 @@ export class SupabaseDB {
 
     const { error } = await supabase
       .from('option_lists')
-      .upsert([{ ...optionList, account_key: accountKey }], { onConflict: 'key' })
+      .upsert([{ ...optionList, account_key: accountKey }], { onConflict: 'key,account_key' })
 
     if (error) {
       console.error('Error upserting option list:', error)
